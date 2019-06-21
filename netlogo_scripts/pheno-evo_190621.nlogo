@@ -134,7 +134,7 @@ to go
   ; effect of toxin
   ask turtles[
     if [toxin] of patch-here > 0[ ; checks if toxin is present
-      set health (health - (health * toxin)) ; updates health
+      set health (health - (damage-rate * toxin)) ; updates health
       if health < death-threshold[ ; checks if health is below threshold
         die ;if yes, die
       ]]
@@ -146,54 +146,61 @@ to go
 
   ; toxin degradation
   ask turtles[
-    if [toxin] of patch-here > 0[ ; if there's toxin on the current patch
-      set toxin (toxin - degrade-rate) ; degrade some of it ;; we may need to change how this works
-    ]]
+    if [toxin] of patch-here > 0 [ ; if there's toxin on the current patch
+      let dr degrade-rate
+      ask patch-here [
+      set toxin (toxin - dr) ; degrade some of it ... FOR THE LONG RUN consider whether this should really be linear
+        if toxin < 0 [set toxin 0]
+  ]]]
 
-    ;switching phenotype
+  ; switching phenotype
   ask turtles[
     if random-float 1 < switch-prob[ ; choose a random number and compare to switching probability
       set degrade-rate random-normal degrade-mu degrade-sig; draw from same gaussian set up for the turtle
+      if degrade-rate < 0 [set degrade-rate 0]
+      if degrade-rate > 1 [set degrade-rate 1]
       set color palette:scale-gradient [[165 0 38][255 255 191][49 54 149]] degrade-rate 0 1 ; color according to phenotype
     ]]
 
   ;; reproduction and mutation
-  ;; mutate, if necessary
   ask turtles [
-    if random-float 1 < mutation-rate [
-      let new-mu [degrade-mu] of self + (random-float 0.1 - 0.05) ;; we may choose to mutate something else...
-    ]
-
-  ;; store the values that are heritable - for reproduction
-    let new-switch-prob [switch-prob] of self
-    let new-degrade-rate [degrade-rate] of self
-    let new-barcode [barcode] of self
-    let new-sig [degrade-sig] of self
-    let new-mu [degrade-mu] of self
-
     ;; make new cells ;; may need to rewrite this to make use of the "hatch" primitive instead
     if health > growth-threshold[ ; if health is greater than reproduction threshold
       if (count neighbors with [not any? turtles-here]) > 0 [ ; only reproduce if there's space
-        let growth-space patch-set neighbors with [not any? turtles-here] ; find patches with no turtles
-        ask one-of growth-space [ ; choose one of those patches to sprout
-          sprout 1 [
-            if heritable? [ ;; if heritability is turned on, inherit parent's phenotype
-              set switch-prob new-switch-prob
-              set degrade-rate new-degrade-rate
-              set barcode new-barcode
-              set degrade-mu new-mu
-              set degrade-sig new-sig
-              set color palette:scale-gradient [[165 0 38][255 255 191][49 54 149]] degrade-rate 0 1
-              set health 1
-              set growth-rate basal-growth-rate * (1 - degrade-rate ^ alpha)
-              ]]]]]]
+        if random-float 1 < growth-rate [
+          let growth-space patch-set neighbors with [not any? turtles-here] ; find patches with no turtles
+
+          ;; store the values that are heritable - for reproduction
+          let new-switch-prob [switch-prob] of self
+          let new-degrade-rate [degrade-rate] of self
+          let new-barcode [barcode] of self
+          let new-sig [degrade-sig] of self
+          let new-mu [degrade-mu] of self
+          ;; mutate, if necessary
+          if random-float 1 < mutation-rate [
+            set new-mu new-mu + (random-float 0.1 - 0.05) ;; we may choose to mutate something else...
+          ]
+
+          ;; now reproduce
+          ask one-of growth-space [ ; choose one of those patches to sprout
+            sprout 1 [
+              if heritable? [ ;; if heritability is turned on, inherit parent's phenotype
+                set switch-prob new-switch-prob
+                set degrade-rate new-degrade-rate
+                set barcode new-barcode
+                set degrade-mu new-mu
+                set degrade-sig new-sig
+                set color palette:scale-gradient [[165 0 38][255 255 191][49 54 149]] degrade-rate 0 1
+                set health 1
+                set growth-rate basal-growth-rate * (1 - degrade-rate ^ alpha)
+  ]]]]]]]
 
   ;; patches stuff: diffuse toxin + food
   diffuse toxin diff-rate
   ; diffuse food diff-rate
   ask patches[
-    if toxin > 0 [set pcolor scale-color gray (1 - log toxin 10) 0 6] ; set toxin color according to concentration
     if toxin < toxin-limit [set toxin 0] ; if toxin goes below threshold, make it zero
+    if toxin > 0 [set pcolor scale-color gray (1 - log toxin 10) 0 6] ; set toxin color according to concentration
   ]
   ;; below is the diffusion algorithm we discussed 6/20 - but it might not be necessary since there's a "diffuse" primitive
   ;ask patches [
@@ -390,7 +397,7 @@ initial-mu
 initial-mu
 0
 1
-0.5
+0.94
 0.01
 1
 NIL
@@ -420,7 +427,7 @@ initial-switch-prob
 initial-switch-prob
 0
 1
-0.03
+0.87
 0.01
 1
 NIL
