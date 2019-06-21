@@ -216,7 +216,6 @@ to go
   ;]
 
   tick
-  plot count turtles
 
 end
 @#$#@#$#@
